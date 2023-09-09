@@ -19,6 +19,7 @@ class angPTObject():
         return self.get_function_table()
     
     def get_PE_section(self):     
+        """PE section을 순회하면서 .data 영역을 가져오는 함수"""
         pe = pefile.PE(self.driver_path)
         data_section = None
         
@@ -35,12 +36,14 @@ class angPTObject():
                     self.external_functions.append(imp.address)
 
     def find_function_end(self, p, function_address):
+        """함수 블록 끝을 반환하는 함수"""
         function = p.kb.functions[function_address]
         block_addresses = [x.addr for x in function.blocks]
         
         return max(block_addresses)
     
     def get_function_table(self):
+        """함수 블록을 가져오고 안에 자세한 정보를 저장하는 함수"""
         start_address = self.dispatcher_address
         
         p = angr.Project(self.driver_path, auto_load_libs=False)#, main_opts={"custom_base_addr": start_address})
@@ -81,12 +84,8 @@ class angPTObject():
         ######################################
         cfg = p.analyses.CFGFast()
         global_access_offset = list(p.kb.xrefs.get_xrefs_by_dst_region(self.global_variable_range_start, self.global_variable_range_end))
-
-        #<BV64 0x139aa>, <BV64 0x13985>, <BV64 0x1393c>, <BV64 0x13918>, <BV64 0x138ed>
-        #ioctl = {2285584: {'start': 80109, 'end': 80151}, 2285580: {'start': 80152, 'end': 80187}, 2285576: {'start': 80188, 'end': 80260}, 2285572: {'start': 80261, 'end': 80297}, 2285568: {'start': 80298, 'end': 80359}}
         
         global_xref = list()
-        #xref 순회
         for var in global_access_offset:
             #함수 정적 분석 순회
             for key, value in called_functions_completed.items():
@@ -101,7 +100,6 @@ class angPTObject():
                 if rng['start'] <= var.ins_addr <= rng['end']:
                     global_xref.append(var)
                 
-        #self.ioctl_2_global(p, called_functions_completed, ioctl, global_xref)
         return self.ioctl_2_global(p, called_functions_completed, self.ioctl_infos, global_xref)
         
     def ioctl_2_global(self, p, called_functions_completed, ioctl_block_addresses, global_xref):
