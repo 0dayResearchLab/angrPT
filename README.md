@@ -13,6 +13,7 @@ IREC
 │   ├── static                              # Techniques using static analysis techniques
 │   └──wdm.py                               # WDM driver analysis framework
 └── irec.py                                 # Main module
+└── angPT.py                                # angPT module
 ```
 
 ## Getting started
@@ -29,5 +30,5 @@ $ source $YOUR_NAME/bin/activate
 
 # requirements
 $ apt install radare2
-$ pip install angr boltons argparse ipdb r2pipe
+$ pip install angr boltons argparse ipdb r2pipe angr-utils
 ```
