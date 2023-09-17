@@ -22,8 +22,8 @@ We recommend python3.8 virtual environment to use IREC.
 
 ```shell
 # make virtual environment
-$ pip install virtualenv
 $ pip install virtualenvwrapper
+$ sudo apt install python3-virtualenv
 
 $ virtualenv $YOUR_NAME
 $ source $YOUR_NAME/bin/activate
