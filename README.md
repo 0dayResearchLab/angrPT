@@ -29,6 +29,6 @@ $ virtualenv $YOUR_NAME
 $ source $YOUR_NAME/bin/activate
 
 # requirements
-$ apt install radare2
+$ sudo apt install radare2
 $ pip install angr boltons argparse ipdb r2pipe angr-utils
 ```
