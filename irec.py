@@ -140,7 +140,7 @@ if __name__ == '__main__':
             output_name = args.driver.split('.')[0]
         mkdir(f'result/{output_name}')
         
-        with open(f'result/{output_name}/{output_name}.irec', "w") as json_file:
+        with open(f'result/{output_name}/{output_name}.json', "w") as json_file:
             json.dump(ioctl_interface, json_file)
         with open(f'result/{output_name}/{output_name}.rip', "w") as json_file:
             json.dump(ioctl_infos_hex, json_file)
