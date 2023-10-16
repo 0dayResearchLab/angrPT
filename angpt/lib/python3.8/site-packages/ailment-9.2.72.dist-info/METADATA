@@ -1,0 +1,38 @@
+Metadata-Version: 2.1
+Name: ailment
+Version: 9.2.72
+Summary: The angr intermediate language.
+Home-page: https://github.com/angr/ailment
+License: BSD-2-Clause
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Provides-Extra: docs
+Requires-Dist: furo ; extra == 'docs'
+Requires-Dist: myst-parser ; extra == 'docs'
+Requires-Dist: sphinx ; extra == 'docs'
+Requires-Dist: sphinx-autodoc-typehints ; extra == 'docs'
+Provides-Extra: testing
+Requires-Dist: pytest ; extra == 'testing'
+Requires-Dist: pytest-xdist ; extra == 'testing'
+
+# AILment
+[![Latest Release](https://img.shields.io/pypi/v/ailment.svg)](https://pypi.python.org/pypi/ailment/)
+[![Python Version](https://img.shields.io/pypi/pyversions/ailment)](https://pypi.python.org/pypi/ailment/)
+[![PyPI Statistics](https://img.shields.io/pypi/dm/ailment.svg)](https://pypistats.org/packages/ailment)
+[![License](https://img.shields.io/github/license/angr/ailment.svg)](https://github.com/angr/ailment/blob/master/LICENSE)
+
+AIL is the angr intermediate language.
+
+## Project Links
+Project repository: https://github.com/angr/ailment
+
+Documentation: https://api.angr.io/projects/ailment/en/latest/

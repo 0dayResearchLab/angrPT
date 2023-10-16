@@ -19,7 +19,15 @@ ARG_REGISTRYPATH = 0xdead2000
 ARG_IRP = 0xdead3000
 ARG_IOSTACKLOCATION = 0xdead4000
 
-def speculate_bvs_range(state, bvs):
+ERR_VALUE = 0x1000000
+
+first_sat_state = 0
+
+def speculate_bvs_range(state, bvs):    
+    if not (first_sat_state-ERR_VALUE <= state.addr <= first_sat_state+ERR_VALUE):
+        yield 'err-err'
+        return    
+
     """
     Speculate a range of the symbolic variable.
     """
@@ -324,6 +332,9 @@ class WDMDriverAnalysis(angr.Project):
             except:
                 sat_state = case_state
             finally:
+                global first_sat_state
+                if first_sat_state == 0:
+                    first_sat_state = sat_state.addr
                 ioctl_interface.append({'IoControlCode': hex(ioctl_code), 
                                         'InBufferLength': list(speculate_bvs_range(sat_state, 
                                                                     io_stack_location.fields['InputBufferLength'])),

@@ -1,0 +1,60 @@
+Metadata-Version: 2.1
+Name: claripy
+Version: 9.2.72
+Summary: An abstraction layer for constraint solvers
+Home-page: https://github.com/angr/claripy
+License: BSD-2-Clause
+Classifier: License :: OSI Approved :: BSD License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3 :: Only
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: cachetools
+Requires-Dist: decorator
+Requires-Dist: pysmt >=0.9.5
+Requires-Dist: z3-solver ==4.10.2.0
+Provides-Extra: cvc4_solver
+Requires-Dist: cvc4-solver ; extra == 'cvc4_solver'
+Provides-Extra: docs
+Requires-Dist: furo ; extra == 'docs'
+Requires-Dist: myst-parser ; extra == 'docs'
+Requires-Dist: sphinx ; extra == 'docs'
+Requires-Dist: sphinx-autodoc-typehints ; extra == 'docs'
+Provides-Extra: testing
+Requires-Dist: pytest ; extra == 'testing'
+Requires-Dist: pytest-xdist ; extra == 'testing'
+Requires-Dist: cvc4-solver ; (platform_system == "linux") and extra == 'testing'
+
+# claripy
+[![Latest Release](https://img.shields.io/pypi/v/claripy.svg)](https://pypi.python.org/pypi/claripy/)
+[![Python Version](https://img.shields.io/pypi/pyversions/claripy)](https://pypi.python.org/pypi/claripy/)
+[![PyPI Statistics](https://img.shields.io/pypi/dm/claripy.svg)](https://pypistats.org/packages/claripy)
+[![License](https://img.shields.io/github/license/angr/claripy.svg)](https://github.com/angr/claripy/blob/master/LICENSE)
+
+Claripy is an abstracted constraint-solving wrapper.
+
+## Project Links
+Project repository: https://github.com/angr/claripy
+
+Documentation: https://api.angr.io/projects/claripy/en/latest/
+
+## Usage
+
+It is usable!
+
+General usage is similar to Z3:
+
+```python
+>>> import claripy
+>>> a = claripy.BVV(3, 32)
+>>> b = claripy.BVS('var_b', 32)
+>>> s = claripy.Solver()
+>>> s.add(b > a)
+>>> print(s.eval(b, 1)[0])
+```
