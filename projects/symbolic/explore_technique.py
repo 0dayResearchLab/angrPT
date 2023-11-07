@@ -15,6 +15,8 @@ class SwitchStateFinder(angr.ExplorationTechnique):
         ##added
         self.before_ioctl_number = None
         self.switch_block_addresses = {}
+        ##yame
+        self.dup = 0
 
     def setup(self, simgr):
         if CONSTRAINT_MODE not in simgr.stashes:
@@ -26,9 +28,12 @@ class SwitchStateFinder(angr.ExplorationTechnique):
         if stash == 'active' and len(simgr.stashes[stash]) > 1:
             saved_states = [] 
             for state in simgr.stashes[stash]:
+                if self.dup > 30:
+                    break
                 try:
                     io_code = state.solver.eval_one(self._case)
                     if io_code in self.switch_states: # duplicated codes
+                        self.dup += 1
                         continue
 
                     self.switch_states[io_code] = state
