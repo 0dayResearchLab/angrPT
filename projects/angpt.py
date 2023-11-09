@@ -140,11 +140,14 @@ class angPTObject():
             block_insn_op_str = [insn.op_str for insn in block.capstone.insns]
             block_insn_mnemonic = [insn.mnemonic for insn in block.capstone.insns]
             
-            if 'cmp' in block_insn_mnemonic:
+            print(block)
+            print(block_insn_op_str)
+            print(block_insn_mnemonic)
+            if block_insn_mnemonic[0] == 'cmp' and (0 <= block_insn_op_str[0].split(',')[0].find('ptr [rip') <= 8) :
                 xref.type = 1
-            elif 'cmp' not in block_insn_mnemonic:
-                if block_insn_mnemonic[0] in ['mov','movabs','movaps','and','or']  and (0 <= block_insn_op_str[0].split(',')[0].find('ptr [') <= 8):
-                    xref.type = 2
+            else:            
+                if block_insn_mnemonic[0] in ['mov','movabs','movaps','and','or']  and (0 <= block_insn_op_str[0].split(',')[0].find('ptr [rip') <= 8):
+                    xref.type = 2                
                 else:
                     for idx in range(len(block_insn_op_str) - 1):
                         if block_insn_mnemonic[idx] == 'mov':
