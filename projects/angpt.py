@@ -40,7 +40,11 @@ class angPTObject():
         function = p.kb.functions[function_address]
         block_addresses = [x.addr for x in function.blocks]
         
-        return max(block_addresses)
+        last_block_size = 0
+        for b in function.blocks:
+            last_block_size = b.size
+        
+        return max(block_addresses) + last_block_size
     
     def get_function_table(self):
         """함수 블록을 가져오고 안에 자세한 정보를 저장하는 함수"""
@@ -51,20 +55,22 @@ class angPTObject():
         called_functions = dict()
         
         block_address = []
-
-        for block in cfg.kb.functions[start_address].blocks:
+        
+        for block in cfg.kb.functions[start_address].blocks:            
             block_address.append(block.addr)
+        
         
         block_min = min(block_address)
         block_max = max(block_address)
 
         for addr, func in cfg.kb.functions.items():
-            if block_min <= addr <= block_max:
-                for block in func.blocks:
+            if block_min <= addr <= block_max:                
+                for block in func.blocks:                    
                     if block.addr not in self.external_functions:
                         for disasm_block in block.capstone.insns:
+                            
                             if disasm_block.mnemonic == 'call' and called_functions.get(hex(disasm_block.address)) == None \
-                                and disasm_block.op_str.startswith('0x'): #and disasm_block.op_str not in value_cache:
+                                and disasm_block.op_str.startswith('0x'): #and disasm_block.op_str not in value_cache:                                
                                 called_functions[hex(disasm_block.address)] = {
                                     'address' : disasm_block.op_str,
                                 }    
@@ -99,7 +105,7 @@ class angPTObject():
             for ioctl_num, rng in self.ioctl_infos.items():
                 if rng['start'] <= var.ins_addr <= rng['end']:
                     global_xref.append(var)
-                
+        
         return self.ioctl_2_global(p, called_functions_completed, self.ioctl_infos, global_xref)
         
     def ioctl_2_global(self, p, called_functions_completed, ioctl_block_addresses, global_xref):
