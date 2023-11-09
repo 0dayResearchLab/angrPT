@@ -1,0 +1,17 @@
+Metadata-Version: 2.0
+Name: nampa
+Version: 0.1.1
+Summary: FLIRT signatures for python
+Home-page: https://github.com/kenoph/nampa
+Author: Paolo Montesel
+Author-email: UNKNOWN
+License: LGPL
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Programming Language :: Python :: 2
+Classifier: Programming Language :: Python :: 3
+Requires-Dist: future
+
+UNKNOWN
+
+

@@ -142,9 +142,9 @@ if __name__ == '__main__':
         
         with open(f'result/{output_name}/{output_name}.json', "w") as json_file:
             json.dump(ioctl_interface, json_file)
-        with open(f'result/{output_name}/{output_name}.rip', "w") as json_file:
+        with open(f'result/{output_name}/{output_name}.rip.json', "w") as json_file:
             json.dump(ioctl_infos_hex, json_file)
-        with open(f'result/{output_name}/{output_name}.xref', "w") as json_file:
+        with open(f'result/{output_name}/{output_name}.xref.json', "w") as json_file:
             json.dump(xref_spider, json_file)
         
     else:
