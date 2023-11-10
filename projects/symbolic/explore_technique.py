@@ -1,11 +1,13 @@
 import angr
+import time
+import threading 
 
 CONSTRAINT_MODE = 'constraints'
 
 class SwitchStateFinder(angr.ExplorationTechnique):
     """
     An exploration technique to get all states of the switch-case statement.
-    """
+    """    
     def __init__(self, case):
         super(SwitchStateFinder, self).__init__()
         self._case = case
@@ -17,18 +19,33 @@ class SwitchStateFinder(angr.ExplorationTechnique):
         self.switch_block_addresses = {}
         ##yame
         self.dup = 0
+        self.goodbye = 0
+
+    def monitor_value(self, value, timeout):
+        current_value = value
+        def check_value():
+            nonlocal current_value
+            time.sleep(timeout)
+            if value == current_value:
+                print('IOCTL timeout')
+                self.goodbye = 1
+                return
+        
+        thread = threading.Thread(target=check_value)
+        thread.start()
 
     def setup(self, simgr):
+        self.monitor_value(self.dup, 10)
         if CONSTRAINT_MODE not in simgr.stashes:
             simgr.stashes[CONSTRAINT_MODE] = []
 
     def step(self, simgr, stash='active', **kwargs):
         simgr = simgr.step(stash=stash, **kwargs)
-        
+
         if stash == 'active' and len(simgr.stashes[stash]) > 1:
             saved_states = [] 
             for state in simgr.stashes[stash]:
-                if self.dup > 30:
+                if self.dup > 30 or self.goodbye == 1:
                     break
                 try:
                     io_code = state.solver.eval_one(self._case)

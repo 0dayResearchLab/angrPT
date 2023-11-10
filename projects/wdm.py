@@ -24,6 +24,7 @@ ERR_VALUE = 0x1000000
 first_sat_state = 0
 
 def speculate_bvs_range(state, bvs):    
+    print(state.addr)
     if not (first_sat_state-ERR_VALUE <= state.addr <= first_sat_state+ERR_VALUE):
         yield 'err-err'
         return    

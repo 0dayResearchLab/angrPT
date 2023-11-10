@@ -102,7 +102,7 @@ if __name__ == '__main__':
     start_time = datetime.datetime.utcnow()
     driver = wdm.WDMDriverAnalysis(args.driver, skip_call_mode=args.skip)
     
-    if driver.isWDM():
+    if True:
         print("Finding DeviceName...")
         device_name = driver.find_device_name()
         print("\t> DeviceName : %s\n" % device_name)
