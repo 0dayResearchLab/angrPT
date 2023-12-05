@@ -24,10 +24,10 @@ ERR_VALUE = 0x1000000
 first_sat_state = 0
 
 def speculate_bvs_range(state, bvs):    
-    print(state.addr)
-    if not (first_sat_state-ERR_VALUE <= state.addr <= first_sat_state+ERR_VALUE):
-        yield 'err-err'
-        return    
+    # print(state.addr)
+    # if not (first_sat_state-ERR_VALUE <= state.addr <= first_sat_state+ERR_VALUE):
+    #     yield 'err-err'
+    #     return    
 
     """
     Speculate a range of the symbolic variable.
@@ -36,20 +36,28 @@ def speculate_bvs_range(state, bvs):
     minv = state.solver.min(bvs)
     maxv = state.solver.max(bvs)
     
+    result = []
     if maxv == inf:  # when the max is infinite
-        yield '%d-inf' % minv
-        return
+        result.append('%d-inf' % minv)
+        return result
+    
+    if maxv > 0x2000:
+        maxv = 0x2000    
     
     i = start = minv
     while i <= maxv + 1:
         if not state.solver.satisfiable([bvs == i]):
-            yield '%d-%d' % (start, i - 1)
+            result.append('%d-%d' % (start, i - 1))
 
             # find next start
             while not state.solver.satisfiable([bvs == i]) and i <= maxv + 1:
                 i += 1
             start = i
         i += 1
+    
+    if len(result)<1:
+        result.append('%d-inf' % minv)
+    return result
 
 class WDMDriverFactory(angr.factory.AngrObjectFactory):
     """
@@ -90,7 +98,7 @@ class WDMDriverAnalysis(angr.Project):
         
         self.driver_path = args[0]
         # Static binary analysis using radare2
-        self.static_analyzer = StaticAnalysis(self.driver_path)
+        # self.static_analyzer = StaticAnalysis(self.driver_path)
         self.skip_call_mode = kwargs.pop('skip_call_mode', False)
 
         super(WDMDriverAnalysis, self).__init__(*args, **kwargs)
@@ -122,7 +130,7 @@ class WDMDriverAnalysis(angr.Project):
         elif mode == 'skip_call':
             def skip_function_by_arguments(state):
                 # Get parameters of the current function.
-                parameters = self.static_analyzer.get_function_parameters(state.addr)
+                parameters = []
 
                 skip = True
                 for arg_type in parameters:
@@ -261,7 +269,7 @@ class WDMDriverAnalysis(angr.Project):
         # Find all I/O control codes.
         state_finder = explore_technique.SwitchStateFinder(io_stack_location.fields['IoControlCode'])
         simgr.use_technique(state_finder)
-        simgr.run()
+        simgr.run(n=30)
 
         ioctl_interface = []
 
@@ -298,27 +306,80 @@ class WDMDriverAnalysis(angr.Project):
                 self.set_mode('force_skip_call', unsat_state)
                 self.set_mode('symbolize_global_variables', sat_state)
                 self.set_mode('symbolize_global_variables', unsat_state)
-                simgr_sat = self.project.factory.simgr(sat_state)
-                simgr_unsat = self.project.factory.simgr(unsat_state)
 
-                def determine_unsat():
-                    for _ in range(30):
-                        simgr_sat.step()
-                        simgr_unsat.step()
-                        
-                        if len(simgr_sat.active) == 0:
-                            yield False
-                        elif len(simgr_unsat.active) == 0:
-                            yield True
+                global found
+                found = False
 
-                if not next(determine_unsat()):
+                simgr_sat = self.factory.simgr(sat_state)
+                simgr_unsat = self.factory.simgr(unsat_state)
+                
+                def sat_state_bp(state):
+                    ntstatus_value = state.solver.eval(state.inspect.mem_write_expr)
+                    
+                    if ntstatus_value <= 0xBFFFFFFF: 
+                        global found, swap
+                        found = True
+                        swap = False
+
+                def unsat_state_bp(state):
+                    ntstatus_value = state.solver.eval(state.inspect.mem_write_expr)
+                    if ntstatus_value <= 0xBFFFFFFF: 
+                        global found, swap
+                        swap = found = True
+                
+                sat_state.inspect.b('mem_write', when=angr.BP_AFTER, 
+                    mem_write_address = ARG_IRP + 0x30,action = sat_state_bp)
+                
+                unsat_state.inspect.b('mem_write', when=angr.BP_AFTER, 
+                    mem_write_address = ARG_IRP + 0x30,action = unsat_state_bp)
+                
+                for _ in range(20):
+                    if found:
+                        break
+                    simgr_sat.step()
+                    simgr_unsat.step()
+
+                if found and swap:
                     sat_state, unsat_state = unsat_state, sat_state
+
+                if not found:
+                    self.set_mode('force_skip_call', sat_state)
+                    self.set_mode('force_skip_call', unsat_state)
+                    self.set_mode('symbolize_global_variables', sat_state)
+                    self.set_mode('symbolize_global_variables', unsat_state)
+                    simgr_sat = self.project.factory.simgr(sat_state)
+                    simgr_unsat = self.project.factory.simgr(unsat_state)
+
+                    def determine_unsat():
+                        sat_count = 0
+                        unsat_count = 0
+
+                        for _ in range(50):
+                            if len(simgr_sat.active):
+                                sat_count+=1
+                                simgr_sat.step()
+                            if len(simgr_unsat.active):
+                                unsat_count+=1
+                                #print(simgr_unsat.active)
+                                simgr_unsat.step()
+                        
+                        if sat_count > unsat_count:
+                            return True
+                        elif sat_count < unsat_count:
+                            return False
+                        else:
+                            assert(1==2), "this code never be executed"
+                    
+                    if not determine_unsat():
+                        sat_state, unsat_state = unsat_state, sat_state
+                else:
+                    pass                
 
                 # Get valid constraints.
                 def get_valid_constraints(sat_state, unsat_state):
                     simgr = self.project.factory.simgr(sat_state)
 
-                    for _ in range(10):
+                    for _ in range(30):
                         simgr.step()
 
                     for states in list(simgr.stashes.values()):
