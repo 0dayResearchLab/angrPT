@@ -23,6 +23,8 @@ ERR_VALUE = 0x1000000
 
 good_range = 0
 
+
+hihi= False
 def speculate_bvs_range(state, bvs):        
     # if not (first_sat_state-ERR_VALUE <= state.addr <= first_sat_state+ERR_VALUE):
     #     yield 'err-err'
@@ -315,22 +317,15 @@ class WDMDriverAnalysis(angr.Project):
                     self.set_mode('symbolize_global_variables', st)
                     simgr = self.project.factory.simgr(st)
                     result = []
-                    for _ in range(20):
-                        if len(simgr.active)>0:
-                            simgr.step()
+                    global hihi
+                    hihi = False
 
-                    founded = False
-                    for state in simgr.active:
-                        symbolic_expr = state.mem[0xdead3030].int.resolved
-                        concrete_value = state.solver.eval(symbolic_expr)
-
-                     #   print("Io status is ",hex(concrete_value), state)
-
-                        if concrete_value <0xBFFFFFFF:
-                            founded = True
-
-                            if ioctl_code == 0x8219e014:
-                                print(state)
+                    def sat_state_bp(state):
+                        ntstatus_value = state.solver.eval(state.inspect.mem_write_expr)
+                        
+                        if ntstatus_value <= 0xBFFFFFFF: 
+                            global hihi
+                            hihi = True
                             x= {'IoControlCode': hex(ioctl_code), 
                                 'InBufferLength': list(speculate_bvs_range(state, 
                                                             io_stack_location.fields['InputBufferLength'])),
@@ -338,8 +333,39 @@ class WDMDriverAnalysis(angr.Project):
                                                             io_stack_location.fields['OutputBufferLength'])
                                 )}
                             ioctl_interface.append(x)
-                            print("simgr.active",x,"\n")
-                            break
+
+                    st.inspect.b('mem_write', when=angr.BP_AFTER, 
+                        mem_write_address = ARG_IRP + 0x30,action = sat_state_bp)
+          
+                    for _ in range(20):
+                        if len(simgr.active)>0 and not hihi:
+                            simgr.step()
+
+                    founded = False
+                    if hihi:
+                        founded=True
+                    else:    
+                        for state in simgr.active:
+                            symbolic_expr = state.mem[0xdead3030].int.resolved
+                            concrete_value = state.solver.eval(symbolic_expr)
+
+                        #   print("Io status is ",hex(concrete_value), state)
+
+                            if concrete_value <0xBFFFFFFF:
+                                founded = True
+
+                                for st in state.history.bbl_addrs:
+                                    print(hex(st))
+
+                                x= {'IoControlCode': hex(ioctl_code), 
+                                    'InBufferLength': list(speculate_bvs_range(state, 
+                                                                io_stack_location.fields['InputBufferLength'])),
+                                    'OutBufferLength': list(speculate_bvs_range(state,
+                                                                io_stack_location.fields['OutputBufferLength'])
+                                    )}
+                                ioctl_interface.append(x)
+                                #print("simgr.active",x,"\n")
+                                break
 
                     if not founded:
 
@@ -358,7 +384,7 @@ class WDMDriverAnalysis(angr.Project):
                                                                 io_stack_location.fields['OutputBufferLength'])
                                     )}
                                 ioctl_interface.append(x)
-                                print("simgr.deadended",x,"\n")
+                                #print("simgr.deadended",x,"\n")
                                 break
 
                     if not founded:                        
