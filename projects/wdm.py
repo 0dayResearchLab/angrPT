@@ -21,10 +21,9 @@ ARG_IOSTACKLOCATION = 0xdead4000
 
 ERR_VALUE = 0x1000000
 
-first_sat_state = 0
+good_range = 0
 
-def speculate_bvs_range(state, bvs):    
-    # print(state.addr)
+def speculate_bvs_range(state, bvs):        
     # if not (first_sat_state-ERR_VALUE <= state.addr <= first_sat_state+ERR_VALUE):
     #     yield 'err-err'
     #     return    
@@ -264,7 +263,7 @@ class WDMDriverAnalysis(angr.Project):
         irp = structures.IRP(state, ARG_IRP)
 
         state.solver.add(irp.fields['Tail.Overlay.CurrentStackLocation'] == io_stack_location.address)
-        #state.solver.add(io_stack_location.fields['MajorFunction'] == 14)
+        state.solver.add(io_stack_location.fields['MajorFunction'] == 14)
 
         # Find all I/O control codes.
         state_finder = explore_technique.SwitchStateFinder(io_stack_location.fields['IoControlCode'])
@@ -293,129 +292,157 @@ class WDMDriverAnalysis(angr.Project):
                             if 'BufferLength' in str(constraint) and \
                                 str(constraint) not in preconstraints:
                                 yield state
-
-            # Inspect what constraints are used.
             constraint_states = get_constraint_states(case_state)
 
-            try:
-                sat_state = next(constraint_states)
-                unsat_state = next(constraint_states)
+            print("analyze start "+hex(ioctl_code)+" addr is "+hex(case_state.addr))
+            def is_there_constraint(st):
+                self.set_mode('symbolize_global_variables', st)
+                simgr = self.project.factory.simgr(st)
+                for _ in range(10):
+                    simgr.step()
 
-                # Determine which constraints are valid.
-                self.set_mode('force_skip_call', sat_state)
-                self.set_mode('force_skip_call', unsat_state)
-                self.set_mode('symbolize_global_variables', sat_state)
-                self.set_mode('symbolize_global_variables', unsat_state)
+                    for state in simgr.active:
+                        for constraint in state.history.jump_guards:
+                            if 'BufferLength' in str(constraint):
+                                return True
+                return False
 
-                global found
-                found = False
+            # Inspect what constraints are used.
+            is_contraint = is_there_constraint(case_state)
+           # return
+            if is_contraint:
+                def gogogo(st):
+                    self.set_mode('symbolize_global_variables', st)
+                    simgr = self.project.factory.simgr(st)
+                    result = []
+                    for _ in range(20):
+                        if len(simgr.active)>0:
+                            simgr.step()
 
-                simgr_sat = self.factory.simgr(sat_state)
-                simgr_unsat = self.factory.simgr(unsat_state)
-                
-                def sat_state_bp(state):
-                    ntstatus_value = state.solver.eval(state.inspect.mem_write_expr)
-                    
-                    if ntstatus_value <= 0xBFFFFFFF: 
-                        global found, swap
-                        found = True
-                        swap = False
+                    founded = False
+                    for state in simgr.active:
+                        symbolic_expr = state.mem[0xdead3030].int.resolved
+                        concrete_value = state.solver.eval(symbolic_expr)
 
-                def unsat_state_bp(state):
-                    ntstatus_value = state.solver.eval(state.inspect.mem_write_expr)
-                    if ntstatus_value <= 0xBFFFFFFF: 
-                        global found, swap
-                        swap = found = True
-                
-                sat_state.inspect.b('mem_write', when=angr.BP_AFTER, 
-                    mem_write_address = ARG_IRP + 0x30,action = sat_state_bp)
-                
-                unsat_state.inspect.b('mem_write', when=angr.BP_AFTER, 
-                    mem_write_address = ARG_IRP + 0x30,action = unsat_state_bp)
-                
-                for _ in range(20):
-                    if found:
-                        break
-                    simgr_sat.step()
-                    simgr_unsat.step()
+                     #   print("Io status is ",hex(concrete_value), state)
 
-                if found and swap:
-                    sat_state, unsat_state = unsat_state, sat_state
+                        if concrete_value <0xBFFFFFFF:
+                            founded = True
 
-                if not found:
-                    self.set_mode('force_skip_call', sat_state)
-                    self.set_mode('force_skip_call', unsat_state)
-                    self.set_mode('symbolize_global_variables', sat_state)
-                    self.set_mode('symbolize_global_variables', unsat_state)
-                    simgr_sat = self.project.factory.simgr(sat_state)
-                    simgr_unsat = self.project.factory.simgr(unsat_state)
+                            if ioctl_code == 0x8219e014:
+                                print(state)
+                            x= {'IoControlCode': hex(ioctl_code), 
+                                'InBufferLength': list(speculate_bvs_range(state, 
+                                                            io_stack_location.fields['InputBufferLength'])),
+                                'OutBufferLength': list(speculate_bvs_range(state,
+                                                            io_stack_location.fields['OutputBufferLength'])
+                                )}
+                            ioctl_interface.append(x)
+                            print("simgr.active",x,"\n")
+                            break
 
-                    def determine_unsat():
-                        sat_count = 0
-                        unsat_count = 0
+                    if not founded:
 
-                        for _ in range(50):
-                            if len(simgr_sat.active):
-                                sat_count+=1
+                        for state in simgr.deadended:
+                            symbolic_expr = state.mem[0xdead3030].int.resolved
+                            concrete_value = state.solver.eval(symbolic_expr)
+
+                            #print("Io status is ",hex(concrete_value), state)
+
+                            if concrete_value <0xBFFFFFFF:
+                                founded = True
+                                x= {'IoControlCode': hex(ioctl_code), 
+                                    'InBufferLength': list(speculate_bvs_range(state, 
+                                                                io_stack_location.fields['InputBufferLength'])),
+                                    'OutBufferLength': list(speculate_bvs_range(state,
+                                                                io_stack_location.fields['OutputBufferLength'])
+                                    )}
+                                ioctl_interface.append(x)
+                                print("simgr.deadended",x,"\n")
+                                break
+
+                    if not founded:                        
+                        sat_state = next(constraint_states)
+                        unsat_state = next(constraint_states)
+
+                        self.set_mode('force_skip_call', sat_state)
+                        self.set_mode('force_skip_call', unsat_state)
+                        self.set_mode('symbolize_global_variables', sat_state)
+                        self.set_mode('symbolize_global_variables', unsat_state)
+                        simgr_sat = self.project.factory.simgr(sat_state)
+                        simgr_unsat = self.project.factory.simgr(unsat_state)
+
+                        def determine_unsat():
+                            for _ in range(30):
                                 simgr_sat.step()
-                            if len(simgr_unsat.active):
-                                unsat_count+=1
-                                #print(simgr_unsat.active)
                                 simgr_unsat.step()
-                        
-                        if sat_count > unsat_count:
-                            return True
-                        elif sat_count < unsat_count:
-                            return False
-                        else:
-                            assert(1==2), "this code never be executed"
-                    
-                    if not determine_unsat():
-                        sat_state, unsat_state = unsat_state, sat_state
-                else:
-                    pass                
+                                
+                                if len(simgr_sat.active) == 0:
+                                    yield False
+                                elif len(simgr_unsat.active) == 0:
+                                    yield True
 
-                # Get valid constraints.
-                def get_valid_constraints(sat_state, unsat_state):
-                    simgr = self.project.factory.simgr(sat_state)
+                        if not next(determine_unsat()):
+                            sat_state, unsat_state = unsat_state, sat_state
 
-                    for _ in range(30):
-                        simgr.step()
+                        # Get valid constraints.
+                        def get_valid_constraints(sat_state, unsat_state):
+                            simgr = self.project.factory.simgr(sat_state)
 
-                    for states in list(simgr.stashes.values()):
-                        for state in states:
-                            if unsat_state.addr not in state.history.bbl_addrs:
-                                return state
+                            for _ in range(10):
+                                simgr.step()
 
-                sat_state = get_valid_constraints(sat_state, unsat_state)
-                if not sat_state:
-                    sat_state = case_state
+                            for states in list(simgr.stashes.values()):
+                                for state in states:
+                                    if unsat_state.addr not in state.history.bbl_addrs:
+                                        return state
 
-            except:
-                sat_state = case_state
-            finally:
-                global first_sat_state
-                if first_sat_state == 0:
-                    first_sat_state = sat_state.addr
-                ioctl_interface.append({'IoControlCode': hex(ioctl_code), 
+                        sat_state = get_valid_constraints(sat_state, unsat_state)
+                        if not sat_state:
+                            sat_state = case_state
+                        ioctl_interface.append({'IoControlCode': hex(ioctl_code), 
                                         'InBufferLength': list(speculate_bvs_range(sat_state, 
                                                                     io_stack_location.fields['InputBufferLength'])),
                                         'OutBufferLength': list(speculate_bvs_range(sat_state,
                                                                     io_stack_location.fields['OutputBufferLength'])
                                         )})
+
+                gogogo(case_state)
                 
+
+            else:
+               # print("no constraint")
+                sat_state = case_state
+                x= {'IoControlCode': hex(ioctl_code), 
+                                        'InBufferLength': list(speculate_bvs_range(sat_state, 
+                                                                    io_stack_location.fields['InputBufferLength'])),
+                                        'OutBufferLength': list(speculate_bvs_range(sat_state,
+                                                                    io_stack_location.fields['OutputBufferLength'])
+                                        )}
+                ioctl_interface.append(x)                
+        
+        ioctl_interface = sorted(ioctl_interface, key=lambda x:int(x['IoControlCode'], 16))
+
         switch_block_addresses_fixed = {}
         prev_key = None
         for key, value in state_finder.switch_block_addresses.items():
             if prev_key is not None:
                 switch_block_addresses_fixed[prev_key] = {'start': state_finder.switch_block_addresses[prev_key], 'end': value - 1}
             prev_key = key
-            
-        average_diff = sum(switch_block_addresses_fixed[key]['end']- switch_block_addresses_fixed[key]['start'] for key, value in switch_block_addresses_fixed.items()) / (len(switch_block_addresses_fixed) - 1)
-        if prev_key is not None:
-            switch_block_addresses_fixed[prev_key] = {'start': state_finder.switch_block_addresses[prev_key], 'end': int(state_finder.switch_block_addresses[prev_key] + average_diff)}
+        
+        try:
+            average_diff = sum(switch_block_addresses_fixed[key]['end']- switch_block_addresses_fixed[key]['start'] for key, value in switch_block_addresses_fixed.items()) / (len(switch_block_addresses_fixed) - 1)
+            if prev_key is not None:
+                switch_block_addresses_fixed[prev_key] = {'start': state_finder.switch_block_addresses[prev_key], 'end': int(state_finder.switch_block_addresses[prev_key] + average_diff)}
+        except:
+            pass
         
         #print(state_finder.switch_block_addresses)
         #print(switch_block_addresses_fixed)
         
+        switch_block_addresses_fixed = [
+            {'IoControlCode': key, **value} for key, value in switch_block_addresses_fixed.items()
+        ]        
+        switch_block_addresses_fixed = sorted(switch_block_addresses_fixed, key=lambda x:x['IoControlCode'])
+
         return ioctl_interface, switch_block_addresses_fixed

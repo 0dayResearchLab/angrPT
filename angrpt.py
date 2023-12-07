@@ -44,12 +44,22 @@ class FullPath(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, os.path.abspath(os.path.expanduser(values)))
 
-def to_hex_simple(d):
-    hex_data = {}
+def to_hex_simple(d):        
+    hex_data = {}    
     for key, value in d.items():
         hex_key = hex(key)
         hex_value = {k: hex(v) for k, v in value.items()}
         hex_data[hex_key] = hex_value
+    return hex_data
+
+def to_rip_hex_simple(l):
+    hex_data = []
+    for res in l:
+        temp = dict()
+        temp['IoControlCode'] = hex(res['IoControlCode'])
+        temp['start'] = hex(res['start'])
+        temp['end'] = hex(res['end'])
+        hex_data.append(temp)
     return hex_data
 
 def to_hex_xref(d):
@@ -120,18 +130,17 @@ if __name__ == '__main__':
         elapsed = boltons.timeutils.decimal_relative_time(start_time, datetime.datetime.utcnow())
         print("\nCompleted ({0:.1f} {1})".format(*elapsed))
 
-        print("\t> [angPT] IOCTL RIP INFO :")
-        ioctl_infos_hex = to_hex_simple(ioctl_infos)
+        print("\t> [angrPT] IOCTL RIP INFO :")
+        ioctl_infos_hex = to_rip_hex_simple(ioctl_infos)
         pp.pprint(ioctl_infos_hex)
 
         try:
             angrPT = mangrpt.angrPTObject(args.driver, mj_device_control_func, ioctl_infos)
             xref_spider = to_hex_xref(angrPT.go_analysis())
-            print('[angPT] success')
+            print('[angrPT] success')
 
         except Exception as e:
-            print('[angPT] fail')
-            print(e)
+            print('[angrPT] fail')            
             xref_spider = 'error'
         
         if '/' in args.driver:

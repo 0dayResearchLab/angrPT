@@ -35,7 +35,7 @@ class SwitchStateFinder(angr.ExplorationTechnique):
         thread.start()
 
     def setup(self, simgr):
-        self.monitor_value(self.dup, 10)
+        #self.monitor_value(self.dup, 30)        
         if CONSTRAINT_MODE not in simgr.stashes:
             simgr.stashes[CONSTRAINT_MODE] = []
 
@@ -45,7 +45,7 @@ class SwitchStateFinder(angr.ExplorationTechnique):
         if stash == 'active' and len(simgr.stashes[stash]) > 1:
             saved_states = [] 
             for state in simgr.stashes[stash]:
-                if self.dup > 30 or self.goodbye == 1:
+                if self.dup > 100 or self.goodbye == 1:
                     break
                 try:
                     io_code = state.solver.eval_one(self._case)
