@@ -353,10 +353,6 @@ class WDMDriverAnalysis(angr.Project):
 
                             if concrete_value <0xBFFFFFFF:
                                 founded = True
-
-                                for st in state.history.bbl_addrs:
-                                    print(hex(st))
-
                                 x= {'IoControlCode': hex(ioctl_code), 
                                     'InBufferLength': list(speculate_bvs_range(state, 
                                                                 io_stack_location.fields['InputBufferLength'])),
