@@ -1,7 +1,11 @@
-# What is angrpt?
-A cross platform framework to recover driver's communication interface. It aims to recover communication interface for fuzzing a kernel driver.
 
-angrpt was implemented using angr and radare2, and generates json files to perform effective fuzzing. That is, it can extract the interface information and constraints of the wdm driver very easily and quickly without any further inefficient manual work. 
+
+# What is angrpt?
+**AngrPT** recover the Windows Driver's DeviceIoControl Interface. It can provide the Constraint of IoControlCode for get higher coverage in Fuzzing Process.
+
+**AngrPT** also analyze global variable dependencies between iocontrol codes.
+
+It based on [IREC](https://github.com/kirasys/irec) and improve the IREC's limitations.
 
 ### Components of angrPT
 
@@ -18,12 +22,9 @@ framework
 └── angrpt.py                               # Main module
 ```
 
-## Getting started
-
-We recommend python3.8 virtual environment to use angrpt.
+## Install Dependencies
 
 ```shell
-# make virtual environment
 pip uninstall virtualenv
 pip install virtualenv
 sudo apt install python3-virtualenv -y
