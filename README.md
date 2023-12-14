@@ -24,12 +24,21 @@ We recommend python3.8 virtual environment to use angrpt.
 
 ```shell
 # make virtual environment
-$ pip install virtualenvwrapper
-$ sudo apt install python3-virtualenv
+pip uninstall virtualenv
+pip install virtualenv
+sudo apt install python3-virtualenv -y
 
-$ virtualenv $YOUR_NAME
-$ source $YOUR_NAME/bin/activate
+virtualenv $YOUR_NAME
+source $YOUR_NAME/bin/activate
 
-# requirements
-$ pip install angr boltons argparse ipdb r2pipe angr-utils
+pip install angr
+pip install virtualenvwrapper
+pip install angr boltons argparse ipdb r2pipe angr-utils
+
+git clone https://github.com/angr/angr-dev.git
+cd angr-dev
+git clone https://github.com/axt/bingraphvis
+pip install -e ./bingraphvis
+git clone https://github.com/axt/angr-utils
+pip install -e ./angr-utils
 ```
