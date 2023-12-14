@@ -42,3 +42,8 @@ pip install -e ./bingraphvis
 git clone https://github.com/axt/angr-utils
 pip install -e ./angr-utils
 ```
+
+## Starting Analyze 
+```
+python3 angrpt.py -d [Driver Name] --user-static [Address of Device IoControl Handler]
+```
