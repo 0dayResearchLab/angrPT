@@ -1,8 +1,11 @@
 BSD 3-Clause License
 
 Copyright (c) 2021, kirasys
-Copyright (c) 2023, Kim jong seong ( bjloed@ajou.ac.kr )
-Copyright (c) 2023, sangjun ( best_collin@naver.com )
+
+Copyright (c) 2023, Kim jong seong (bjloed@ajou.ac.kr)
+
+Copyright (c) 2023, Sangjun (best_collin@naver.com)
+
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
