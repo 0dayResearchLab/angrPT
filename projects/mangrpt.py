@@ -6,20 +6,20 @@ import angrutils
 
 class angrPTObject():
     def __init__(self, driver_path, dispatcher_address, ioctl_infos):
-        self.global_variable_range_start = 0
-        self.global_variable_range_end = 0
+        self.global_var_start = 0
+        self.global_var_end = 0
         self.external_functions = []
         self.driver_path = driver_path
         self.ioctl_infos = ioctl_infos      
         self.dispatcher_address = dispatcher_address
         
     
-    def go_analysis(self):
-        self.get_PE_section()
+    def analyzeXref(self):
+        self.get_data_section()
         return self.get_function_table()
-    
-    def get_PE_section(self):     
-        """PE section을 순회하면서 .data 영역을 가져오는 함수"""
+
+    """ PE section을 순회하면서 .data 영역을 가져오는 함수 for Global Variables"""
+    def get_data_section(self):        
         pe = pefile.PE(self.driver_path)
         data_section = None
         
@@ -27,16 +27,16 @@ class angrPTObject():
             if section.Name.decode().strip('\x00') == ".data":
                 data_section = section
 
-        self.global_variable_range_start = pe.OPTIONAL_HEADER.ImageBase + data_section.VirtualAddress
-        self.global_variable_range_end = self.global_variable_range_start + data_section.SizeOfRawData
+        self.global_var_start = pe.OPTIONAL_HEADER.ImageBase + data_section.VirtualAddress
+        self.global_var_end = self.global_var_start + data_section.SizeOfRawData
         
         for entry in pe.DIRECTORY_ENTRY_IMPORT:
-            for imp in entry.imports:
-                if imp.name:
-                    self.external_functions.append(imp.address)
+            for dll_import in entry.imports:
+                if dll_import.name:
+                    self.external_functions.append(dll_import.address)
 
+    """ 함수 끝 주소를 반환하는 함수"""
     def find_function_end(self, p, function_address):
-        """함수 블록 끝을 반환하는 함수"""
         function = p.kb.functions[function_address]
         block_addresses = [x.addr for x in function.blocks]
         
@@ -46,8 +46,8 @@ class angrPTObject():
         
         return max(block_addresses) + last_block_size
     
+    """함수 블록을 가져오고 안에 자세한 정보를 저장하는 함수 """
     def get_function_table(self):
-        """함수 블록을 가져오고 안에 자세한 정보를 저장하는 함수"""
         start_address = self.dispatcher_address
         
         p = angr.Project(self.driver_path, auto_load_libs=False)#, main_opts={"custom_base_addr": start_address})
@@ -55,16 +55,14 @@ class angrPTObject():
         called_functions = dict()
         
         block_address = []
-        
-        for block in cfg.kb.functions[start_address].blocks:            
+        for block in cfg.kb.functions[start_address].blocks:  
             block_address.append(block.addr)
         
-        
-        block_min = min(block_address)
-        block_max = max(block_address)
+        func_start = min(block_address)
+        func_end = self.find_function_end(p, start_address)
 
         for addr, func in cfg.kb.functions.items():
-            if block_min <= addr <= block_max:                
+            if func_start <= addr <= func_end:                
                 for block in func.blocks:                    
                     if block.addr not in self.external_functions:
                         for disasm_block in block.capstone.insns:
@@ -89,7 +87,7 @@ class angrPTObject():
 
         ######################################
         cfg = p.analyses.CFGFast()
-        global_access_offset = list(p.kb.xrefs.get_xrefs_by_dst_region(self.global_variable_range_start, self.global_variable_range_end))
+        global_access_offset = list(p.kb.xrefs.get_xrefs_by_dst_region(self.global_var_start, self.global_var_end))
         
         global_xref = list()
         for var in global_access_offset:
@@ -100,20 +98,22 @@ class angrPTObject():
                 
                 if internal_function_address_start <= var.ins_addr <= internal_function_address_max:
                     global_xref.append(var)
-                
+    
             #IOCTL 18!!!!!!!!!!!!!!!!!
-            for ioctl_num, rng in self.ioctl_infos.items():
-                if rng['start'] <= var.ins_addr <= rng['end']:
-                    global_xref.append(var)
+            for ioctl_info in self.ioctl_infos:
+                if ioctl_info['start'] <= var.ins_addr <= ioctl_info['end']:
+                   global_xref.append(var)
         
-        return self.ioctl_2_global(p, called_functions_completed, self.ioctl_infos, global_xref)
+        return self.ioctl2global(p, called_functions_completed, self.ioctl_infos, global_xref)
         
-    def ioctl_2_global(self, p, called_functions_completed, ioctl_block_addresses, global_xref):
+    def ioctl2global(self, p, called_functions_completed, ioctl_infos, global_xref):
         ioctl_call_table = {}
         
-        for ioctl_num in ioctl_block_addresses.keys():
+        for ioctl_info in ioctl_infos:
+            ioctl_num = ioctl_info['IoControlCode']
+
             for rip in called_functions_completed.keys():
-                if ioctl_block_addresses[ioctl_num]['start'] <= int(rip, 16) <= ioctl_block_addresses[ioctl_num]['end']:
+                if ioctl_info['start'] <= int(rip, 16) <= ioctl_info['end']:
                     if ioctl_call_table.get(ioctl_num):
                         ioctl_call_table[ioctl_num].append([
                             called_functions_completed[rip]['address'], called_functions_completed[rip]['max']
@@ -126,12 +126,13 @@ class angrPTObject():
                         ])
                         
         #드물게 call_table이 없는 경우도 존재
-        for ioctl_num, rng in ioctl_block_addresses.items():
+        for ioctl_info in ioctl_infos:
+            ioctl_num = ioctl_info['IoControlCode']
             if ioctl_call_table.get(ioctl_num):
                 continue
             ioctl_call_table[ioctl_num] = list()
             ioctl_call_table[ioctl_num].append([
-                rng['start'], rng['end']
+                ioctl_info['start'], ioctl_info['end']
             ]) 
                         
         for xref in global_xref:

@@ -296,7 +296,7 @@ class WDMDriverAnalysis(angr.Project):
                                 yield state
             constraint_states = get_constraint_states(case_state)
 
-            print("analyze start "+hex(ioctl_code)+" addr is "+hex(case_state.addr))
+            print(f'[AngrPT] Starting analysis {hex(ioctl_code)}: raw address is {hex(case_state.addr)}')
             def is_there_constraint(st):
                 self.set_mode('symbolize_global_variables', st)
                 simgr = self.project.factory.simgr(st)

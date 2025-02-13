@@ -37,8 +37,8 @@ import argparse
 import boltons.timeutils
 
 from projects import mangrpt
-
 from projects import wdm
+
 
 class FullPath(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
@@ -75,6 +75,7 @@ def to_hex_xref(d):
 
 def mkdir(dir_path):
     if not os.path.exists(dir_path):
+        print(f'[AngrPT] mkdir {dir_path}')
         os.makedirs(dir_path)
 
 def parse_is_file(dirname):
@@ -113,34 +114,34 @@ if __name__ == '__main__':
     driver = wdm.WDMDriverAnalysis(args.driver, skip_call_mode=args.skip)
     
     if True:
-        print("Finding DeviceName...")
+        print(f'[AngrPT] Analyze Windows Drivers:: {args.driver}.')
+        print(f'[AngrPT] Finding DeviceName ...')
         device_name = driver.find_device_name()
-        print("\t> DeviceName : %s\n" % device_name)
+        print(f'[AngrPT] >> DeviceName : {device_name}')
         
-        print("Finding DispatchDeviceControl...")
+        print(f'[AngrPT] Finding DispatchDeviceControl ...')
         mj_device_control_func = driver.find_dispatcher(args.user_static)
-        print("\t> DispatchDeviceControl : 0x%x\n" % mj_device_control_func)
-
-        print("Recovering the IOCTL interface...")
+        print(f'[AngrPT] >> DispatchDeviceControl : {hex(mj_device_control_func)}')
+       
+        print(f'[AngrPT] Recovering the IOCTL interface ...')
         ioctl_interface, ioctl_infos = driver.recovery_ioctl_interface()
-        print("\t> IOCTL Interface :")
-        pp = pprint.PrettyPrinter(indent=4)
-        pp.pprint(ioctl_interface)
-
+        
+        # print("\t> IOCTL Interface :")
+        # pp = pprint.PrettyPrinter(indent=4)
+        # pp.pprint(ioctl_interface)
         elapsed = boltons.timeutils.decimal_relative_time(start_time, datetime.datetime.utcnow())
-        print("\nCompleted ({0:.1f} {1})".format(*elapsed))
+        print(f'[AngrPT] Completed recovering the IOCTL interface: ({elapsed[0]:.1f} {elapsed[1]}).')
 
-        print("\t> [angrPT] IOCTL RIP INFO :")
+
+        # print("\t> [angrPT] IOCTL RIP INFO :")
         ioctl_infos_hex = to_rip_hex_simple(ioctl_infos)
-        pp.pprint(ioctl_infos_hex)
+        # pp.pprint(ioctl_infos_hex)
 
         try:
             angrPT = mangrpt.angrPTObject(args.driver, mj_device_control_func, ioctl_infos)
-            xref_spider = to_hex_xref(angrPT.go_analysis())
-            print('[angrPT] success')
-
+            xref_spider = to_hex_xref(angrPT.analyzeXref())
         except Exception as e:
-            print('[angrPT] fail')            
+            print(f'[AngrPT] Fail: {e}')            
             xref_spider = 'error'
         
         if '/' in args.driver:
@@ -150,12 +151,15 @@ if __name__ == '__main__':
         mkdir(f'result/{output_name}')
         
         with open(f'result/{output_name}/{output_name}.json', "w") as json_file:
+            print(f'[AngrPT] Write result json: result/{output_name}/{output_name}.json')
             json.dump(ioctl_interface, json_file)
         with open(f'result/{output_name}/{output_name}.rip.json', "w") as json_file:
+            print(f'[AngrPT] Write result json: result/{output_name}/{output_name}.rip.json')
             json.dump(ioctl_infos_hex, json_file)
         with open(f'result/{output_name}/{output_name}.xref.json', "w") as json_file:
+            print(f'[AngrPT] Write result json: result/{output_name}/{output_name}.xref.json')
             json.dump(xref_spider, json_file)
         
     else:
-        print("[!] '%s' is not a supported driver." % args.driver)
+        print(f'[AngrPT] ERROR:: {args.driver} is not a supported driver.')
         sys.exit()
