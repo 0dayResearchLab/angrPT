@@ -35,6 +35,9 @@ import logging
 import datetime
 import argparse
 import boltons.timeutils
+import networkx as nx
+import matplotlib.pyplot as plt
+
 
 from projects import mangrpt
 from projects import wdm
@@ -91,7 +94,7 @@ def setupLogging(args):
     return
 
 def parseArguments():
-    parser = argparse.ArgumentParser(description='Automatic Driver Analysis', usage='driver.py [-d, --driver] driverPath [-L, --log] --user-static [ioctl addr] logLevel [-s, --skip] [-o, --output] output')
+    parser = argparse.ArgumentParser(description='Automatic Driver Analysis', usage='angrPT.py [-d, --driver] driverPath [-L, --log] --user-static [ioctl addr] logLevel [-s, --skip] [-o, --output] output')
     parser.add_argument('-driver', metavar='<file>', required=True, action=FullPath,
                         type=parse_is_file, help='path to the driver')
     parser.add_argument('-log', default='FATAL', choices=('DEBUG', 'INFO', 'WARNING', 'ERROR', 'FATAL'), help='set a logging level')
@@ -103,7 +106,7 @@ def parseArguments():
 if __name__ == '__main__':
     parser, args = parseArguments()
     setupLogging(args)
-    
+
     mkdir('result')
 
     if len(sys.argv) <= 1:
@@ -112,7 +115,8 @@ if __name__ == '__main__':
 
     start_time = datetime.datetime.utcnow()
     driver = wdm.WDMDriverAnalysis(args.driver, skip_call_mode=args.skip)
-    
+
+
     if True:
         print(f'[AngrPT] Analyze Windows Drivers:: {args.driver}.')
         print(f'[AngrPT] Finding DeviceName ...')
@@ -148,7 +152,8 @@ if __name__ == '__main__':
             output_name = args.driver.split('/')[-1].split('.')[0]
         else:
             output_name = args.driver.split('.')[0]
-        mkdir(f'result/{output_name}')
+        # mkdir(f'result/{output_name}')
+        output_name = 'exovol'
         
         with open(f'result/{output_name}/{output_name}.json', "w") as json_file:
             print(f'[AngrPT] Write result json: result/{output_name}/{output_name}.json')
@@ -159,7 +164,9 @@ if __name__ == '__main__':
         with open(f'result/{output_name}/{output_name}.xref.json', "w") as json_file:
             print(f'[AngrPT] Write result json: result/{output_name}/{output_name}.xref.json')
             json.dump(xref_spider, json_file)
-        
+
+
+
     else:
         print(f'[AngrPT] ERROR:: {args.driver} is not a supported driver.')
         sys.exit()

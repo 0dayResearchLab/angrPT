@@ -180,14 +180,12 @@ class WDMDriverAnalysis(angr.Project):
         """
         Return True if the driver is a WDM driver. 
         """
-
         return True if self.project.loader.find_symbol('IoCreateDevice') else False
 
     def find_device_name(self):
         """
         Return DeviceName of the driver. It searchs "DosDevices" statically.
         """
-
         DOS_DEVICES = "\\Device\\".encode('utf-16le')
         data = open(self.driver_path, 'rb').read()
 
@@ -364,7 +362,6 @@ class WDMDriverAnalysis(angr.Project):
                                 break
 
                     if not founded:
-
                         for state in simgr.deadended:
                             symbolic_expr = state.mem[0xdead3030].int.resolved
                             concrete_value = state.solver.eval(symbolic_expr)

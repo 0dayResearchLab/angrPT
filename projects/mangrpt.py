@@ -22,7 +22,6 @@ class angrPTObject():
     def get_data_section(self):        
         pe = pefile.PE(self.driver_path)
         data_section = None
-        
         for section in pe.sections:
             if section.Name.decode().strip('\x00') == ".data":
                 data_section = section
@@ -35,76 +34,60 @@ class angrPTObject():
                 if dll_import.name:
                     self.external_functions.append(dll_import.address)
 
-    """ 함수 끝 주소를 반환하는 함수"""
-    def find_function_end(self, p, function_address):
-        function = p.kb.functions[function_address]
-        block_addresses = [x.addr for x in function.blocks]
-        
-        last_block_size = 0
-        for b in function.blocks:
-            last_block_size = b.size
-        
-        return max(block_addresses) + last_block_size
-    
+
+
     """함수 블록을 가져오고 안에 자세한 정보를 저장하는 함수 """
     def get_function_table(self):
-        start_address = self.dispatcher_address
-        
-        p = angr.Project(self.driver_path, auto_load_libs=False)#, main_opts={"custom_base_addr": start_address})
-        cfg = p.analyses.CFG()
-        called_functions = dict()
-        
-        block_address = []
-        for block in cfg.kb.functions[start_address].blocks:  
-            block_address.append(block.addr)
-        
-        func_start = min(block_address)
-        func_end = self.find_function_end(p, start_address)
+        proj = angr.Project(self.driver_path, auto_load_libs=False)#, main_opts={"custom_base_addr": start_address})
+        cfg = proj.analyses.CFG()
 
-        for addr, func in cfg.kb.functions.items():
-            if func_start <= addr <= func_end:                
-                for block in func.blocks:                    
-                    if block.addr not in self.external_functions:
-                        for disasm_block in block.capstone.insns:
-                            
-                            if disasm_block.mnemonic == 'call' and called_functions.get(hex(disasm_block.address)) == None \
-                                and disasm_block.op_str.startswith('0x'): #and disasm_block.op_str not in value_cache:                                
-                                called_functions[hex(disasm_block.address)] = {
-                                    'address' : disasm_block.op_str,
-                                }    
-                        
-        value_cache = list()
-        called_functions_completed = dict()
-        for key, value in called_functions.items():
-            if value['address'] not in value_cache:            
-                function_block_max = self.find_function_end(p, int(value['address'], 16))
-                value_cache.append(value['address'])
-                
-                called_functions_completed[key] = {
-                    'address' : int(value['address'], 16),
-                    'max' : function_block_max
-                }
+        dispatcher_function = proj.kb.functions[self.dispatcher_address]
+        dispatcher_start_addr = dispatcher_function.addr
+        dispatcher_end_addr = dispatcher_start_addr + dispatcher_function.size
 
         ######################################
-        cfg = p.analyses.CFGFast()
-        global_access_offset = list(p.kb.xrefs.get_xrefs_by_dst_region(self.global_var_start, self.global_var_end))
-        
-        global_xref = list()
-        for var in global_access_offset:
-            #함수 정적 분석 순회
-            for key, value in called_functions_completed.items():
-                internal_function_address_start = called_functions_completed[key]['address']
-                internal_function_address_max = called_functions_completed[key]['max']
-                
-                if internal_function_address_start <= var.ins_addr <= internal_function_address_max:
-                    global_xref.append(var)
-    
-            #IOCTL 18!!!!!!!!!!!!!!!!!
-            for ioctl_info in self.ioctl_infos:
-                if ioctl_info['start'] <= var.ins_addr <= ioctl_info['end']:
-                   global_xref.append(var)
-        
-        return self.ioctl2global(p, called_functions_completed, self.ioctl_infos, global_xref)
+        callgraph = proj.kb.callgraph
+        visited = set()
+        def explore_calls(func_addr, depth=0, max_depth=4):
+            """ DFS 방식으로 함수 호출 관계 탐색 """
+            if func_addr in visited or depth > max_depth:
+                return
+            visited.add(func_addr)
+            # 현재 함수 정보 가져오기
+            func = proj.kb.functions.get(func_addr)
+            func_name = func.name if func else hex(func_addr)
+            print(f"{'  ' * depth}[*] {func_name} ({hex(func_addr)})")
+            # 해당 함수가 호출하는 함수 목록 (Callees)
+            callees = [dst for _, dst in callgraph.out_edges(func_addr)]
+            for callee in callees:
+                explore_calls(callee, depth + 1, max_depth)
+
+        if dispatcher_function:
+            print(f"Call graph for: {dispatcher_function.name}")
+            explore_calls(dispatcher_function.addr, max_depth=5)
+        else:
+            print("Function not found.")
+
+        global_access_offset = list(proj.kb.xrefs.get_xrefs_by_dst_region(self.global_var_start, self.global_var_end))
+
+
+
+        # global_xref = list()
+        # for var in global_access_offset:
+        #     # 함수 정적 분석 순회
+        #     for key, value in called_functions_completed.items():
+        #         internal_function_address_start = called_functions_completed[key]['address']
+        #         internal_function_address_max = called_functions_completed[key]['max']
+        #
+        #         if internal_function_address_start <= var.ins_addr <= internal_function_address_max:
+        #             global_xref.append(var)
+        #
+        #     # IOCTL 18!!!!!!!!!!!!!!!!!
+        #     for ioctl_info in self.ioctl_infos:
+        #         if ioctl_info['start'] <= var.ins_addr <= ioctl_info['end']:
+        #            global_xref.append(var)
+        #
+        # return self.ioctl2global(p, called_functions_completed, self.ioctl_infos, global_xref)
         
     def ioctl2global(self, p, called_functions_completed, ioctl_infos, global_xref):
         ioctl_call_table = {}
@@ -138,12 +121,17 @@ class angrPTObject():
         for xref in global_xref:
             block = p.factory.block(xref.ins_addr)
 
+            for insn in block.capstone.insns:
+                print(f"0x{insn.address:x}: {insn.mnemonic} {insn.op_str}")
             block_insn_op_str = [insn.op_str for insn in block.capstone.insns]
             block_insn_mnemonic = [insn.mnemonic for insn in block.capstone.insns]
-            
+
+            print('===============================================')
+
             #print(block)
             #print(block_insn_op_str)
             #print(block_insn_mnemonic)
+
             if block_insn_mnemonic[0] == 'cmp' and (0 <= block_insn_op_str[0].split(',')[0].find('ptr [rip') <= 8) :
                 xref.type = 1
             else:            
