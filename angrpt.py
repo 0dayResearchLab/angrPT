@@ -141,12 +141,12 @@ if __name__ == '__main__':
         ioctl_infos_hex = to_rip_hex_simple(ioctl_infos)
         # pp.pprint(ioctl_infos_hex)
 
-        try:
-            angrPT = mangrpt.angrPTObject(args.driver, mj_device_control_func, ioctl_infos)
-            xref_spider = to_hex_xref(angrPT.analyzeXref())
-        except Exception as e:
-            print(f'[AngrPT] Fail: {e}')            
-            xref_spider = 'error'
+        # try:
+        angrPT = mangrpt.angrPTObject(args.driver, mj_device_control_func, ioctl_infos)
+        xref_spider = to_hex_xref(angrPT.analyzeXref())
+        # except Exception as e:
+        #     print(f'[AngrPT] Fail: {e}')
+        #     xref_spider = 'error'
         
         if '/' in args.driver:
             output_name = args.driver.split('/')[-1].split('.')[0]
