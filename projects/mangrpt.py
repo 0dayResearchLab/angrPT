@@ -118,37 +118,31 @@ class angrPTObject():
     def ioctl2global(self, proj):
         # offset recovery
         print(f'[AngrPT] Starting recovery xref mods ...')
-        #######TODO: ##########
+
         for xrefs in self.ioctl_xref.values():
             for xref in xrefs:
                 block = proj.factory.block(xref.ins_addr)
 
-                for insn in block.capstone.insns:
-                    print(f"0x{insn.address:x}: {insn.mnemonic} {insn.op_str}")
-                block_insn_op_str = [insn.op_str for insn in block.capstone.insns]
-                block_insn_mnemonic = [insn.mnemonic for insn in block.capstone.insns]
+                #  Xref가 발생한 주소가 속한 BasicBlock에서 0번째가 아닐수도 있잖음. target으로 수정.
+                # for insn in block.capstone.insns:
+                #     print(f"0x{insn.address:x}: {insn.mnemonic} {insn.op_str}")
+                target_insn = next((insn for insn in block.capstone.insns if insn.address == xref.ins_addr), None)
+                block_insn_op_str = target_insn.op_str
+                block_insn_mnemonic = target_insn.mnemonic
+                print(f"Xref Instruction: 0x{target_insn.address:x}: {target_insn.mnemonic} {target_insn.op_str}")
 
-                print('===============================================')
 
                 #print(block)
                 #print(block_insn_op_str)
                 #print(block_insn_mnemonic)
-
-                if block_insn_mnemonic[0] == 'cmp' and (0 <= block_insn_op_str[0].split(',')[0].find('ptr [rip') <= 8) :
+                # TODO: lea instruction 추가,
+                #       mov r11, qword ptr [rip + 0x7074] 같이 2번째 parameter가 xref인 경우도 처리 필요.
+                if block_insn_mnemonic == 'cmp' and (0 <= block_insn_op_str.split(',')[0].find('ptr [rip') <= 8) :
                     xref.type = 1
-                else:
-                    if block_insn_mnemonic[0] in ['mov','movabs','movaps','and','or']  and (0 <= block_insn_op_str[0].split(',')[0].find('ptr [rip') <= 8):
+                elif block_insn_mnemonic in ['mov','movabs','movaps','and','or']  and (0 <= block_insn_op_str.split(',')[0].find('ptr [rip') <= 8):
                         xref.type = 2
-                    else:
-                        for idx in range(len(block_insn_op_str) - 1):
-                            if block_insn_mnemonic[idx] == 'mov':
-                                reg = block_insn_op_str[idx].split(',')[0]
-                                next_reg_position = block_insn_op_str[idx + 1].find('ptr')
-
-                                if next_reg_position > 8 or next_reg_position == -1:
-                                    continue
-                                if reg == block_insn_op_str[idx + 1][next_reg_position: next_reg_position + len(reg)]:
-                                    xref.type = 2
+                print(f'xref mode : {xref.type_string}')
+                print('===============================================')
 
         ioctl_dependency = {}
         for ioctl_code, xrefs in self.ioctl_xref.items():
