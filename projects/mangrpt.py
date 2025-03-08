@@ -3,6 +3,7 @@ import angr
 import json
 import pefile
 import angrutils
+import capstone
 
 class angrPTObject():
     def __init__(self, driver_path, dispatcher_address, ioctl_infos):
@@ -127,21 +128,49 @@ class angrPTObject():
                 # for insn in block.capstone.insns:
                 #     print(f"0x{insn.address:x}: {insn.mnemonic} {insn.op_str}")
                 target_insn = next((insn for insn in block.capstone.insns if insn.address == xref.ins_addr), None)
-                block_insn_op_str = target_insn.op_str
-                block_insn_mnemonic = target_insn.mnemonic
                 print(f"Xref Instruction: 0x{target_insn.address:x}: {target_insn.mnemonic} {target_insn.op_str}")
 
+                for op_index, op in enumerate(target_insn.operands):
+                    if op.type == capstone.x86.X86_OP_MEM:
+                        base_reg = target_insn.reg_name(op.mem.base)
+                        index_reg = target_insn.reg_name(op.mem.index)
+                        scale = op.mem.scale
+                        disp = op.mem.disp
+                        # segment = insn.reg_name(op.mem.segment)
+                        # lmod = op.mem.lmod
+                        size = op.size
 
-                #print(block)
-                #print(block_insn_op_str)
-                #print(block_insn_mnemonic)
-                # TODO: lea instruction 추가,
-                #       mov r11, qword ptr [rip + 0x7074] 같이 2번째 parameter가 xref인 경우도 처리 필요.
-                if block_insn_mnemonic == 'cmp' and (0 <= block_insn_op_str.split(',')[0].find('ptr [rip') <= 8) :
-                    xref.type = 1
-                elif block_insn_mnemonic in ['mov','movabs','movaps','and','or']  and (0 <= block_insn_op_str.split(',')[0].find('ptr [rip') <= 8):
-                        xref.type = 2
-                print(f'xref mode : {xref.type_string}')
+                        #print(block)
+                        #print(block_insn_op_str)
+                        #print(block_insn_mnemonic)
+                        # TODO: lea instruction 추가,
+                        #       mov r11, qword ptr [rip + 0x7074] 같이 2번째 parameter가 xref인 경우도 처리 필요.
+                        if base_reg == 'rip':
+                            if target_insn.mnemonic == 'cmp':
+                                xref.type = 1
+                            elif target_insn.mnemonic in ['mov', 'movabs', 'movaps', 'and', 'or'] and op_index == 0:
+                                xref.type = 2
+
+                        print(f"  - Operand {op_index}: Memory Access")
+                        print(f"    - Base Register: {base_reg if base_reg else 'None'}")
+                        print(f"    - Index Register: {index_reg if index_reg else 'None'}")
+                        print(f"    - Scale: {scale}")
+                        print(f"    - Displacement: {disp:#x}")
+                        print(f"    - Memory Size: {size} bytes" if size else "    - Memory Size: Unknown")
+                        # print(f"    - Segment Register: {segment if segment else 'None'}")
+                        # print(f"    - LMOD: {lmod}")
+
+                        # QWORD PTR (64비트)인지 확인
+                        if size == 8:
+                            print("    - **QWORD PTR detected!**")
+                        elif size == 4:
+                            print("    - **DWORD PTR detected!**")
+                        elif size == 2:
+                            print("    - **WORD PTR detected!**")
+                        elif size == 1:
+                            print("    - **BYTE PTR detected!**")
+
+                print(f"  - Xref Mode : {xref.type_string}")
                 print('===============================================')
 
         ioctl_dependency = {}
