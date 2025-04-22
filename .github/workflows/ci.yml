@@ -1,0 +1,36 @@
+name: CI
+permissions: {}
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '*'
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Project setup (Python / cache / angr 등)
+        uses: ./.github/actions/common-setup
+
+      - name: Run angrpt.py
+        run: |
+          python3 angrpt.py -d ./tests/wdm.sys
+
+      - name: Install test dependencies
+        run: |
+          pip install pytest
+
+      - name: Run output tests
+        run: |
+          pytest --maxfail=1 --disable-warnings -q

@@ -1,0 +1,25 @@
+name: 'Project setup'
+description: 'This action sets up Python, cache, and installs angr and dependencies'
+author: 'Sangjun Park'
+runs:
+  using: 'composite'
+  steps:
+    - name: Set up Python 🐍
+      uses: actions/setup-python@v4
+      with:
+        cache: 'pip'
+
+    - name: Install requirements
+      run: |
+        python -m pip install angr virtualenvwrapper boltons argparse ipdb r2pipe angr-utils
+      shell: bash
+
+    - name: Clone angr-dev and additional dependencies
+      run: |
+        git clone https://github.com/angr/angr-dev.git
+        cd angr-dev
+        git clone https://github.com/axt/bingraphvis
+        pip install -e ./bingraphvis
+        git clone https://github.com/axt/angr-utils
+        pip install -e ./angr-utils
+      shell: bash
