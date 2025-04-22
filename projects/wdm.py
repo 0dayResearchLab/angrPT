@@ -7,7 +7,6 @@ from pprint import pprint as pp
 
 from .symbolic import explore_technique
 from .symbolic import structures
-from .static.static_analysis import StaticAnalysis
 
 DispatchDeviceControl_OFFSET = 0xe0
 DispatchCreate_OFFSET = 0x70
@@ -98,8 +97,6 @@ class WDMDriverAnalysis(angr.Project):
         #kwargs['use_sim_procedures'] = kwargs.pop('use_sim_procedures', False)
         
         self.driver_path = args[0]
-        # Static binary analysis using radare2
-        # self.static_analyzer = StaticAnalysis(self.driver_path)
         self.skip_call_mode = kwargs.pop('skip_call_mode', False)
 
         super(WDMDriverAnalysis, self).__init__(*args, **kwargs)
