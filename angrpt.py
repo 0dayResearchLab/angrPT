@@ -131,6 +131,10 @@ if __name__ == '__main__':
         ioctl_infos_hex = to_rip_hex_simple(ioctl_infos)
         pp.pprint(ioctl_infos_hex)
         xref_spider = None
+        new_ioctl_infos = {}
+        for item in ioctl_infos:
+            new_ioctl_infos[item['IoControlCode']] = {'start': item['start'], 'end': item['end']}
+        ioctl_infos = new_ioctl_infos
         try:
             angrPT = mangrpt.angrPTObject(args.driver, mj_device_control_func, ioctl_infos)
             if angrPT is not None:

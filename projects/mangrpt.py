@@ -15,7 +15,7 @@ class angrPTObject():
         
     
     def go_analysis(self):
-        if self.get_PE_section() is None:
+        if self.get_PE_section() is False:
             print("No .data section in this driver.")
             return {}
         return self.get_function_table()
@@ -29,7 +29,7 @@ class angrPTObject():
             if section.Name.decode().strip('\x00') == ".data":
                 data_section = section
         if data_section is None:
-            return None
+            return False
         
         self.global_variable_range_start = pe.OPTIONAL_HEADER.ImageBase + data_section.VirtualAddress
         self.global_variable_range_end = self.global_variable_range_start + data_section.SizeOfRawData
@@ -38,6 +38,7 @@ class angrPTObject():
             for imp in entry.imports:
                 if imp.name:
                     self.external_functions.append(imp.address)
+        return True
 
     def find_function_end(self, p, function_address):
         """함수 블록 끝을 반환하는 함수"""
