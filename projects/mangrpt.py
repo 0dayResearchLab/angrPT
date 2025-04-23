@@ -15,7 +15,9 @@ class angrPTObject():
         
     
     def go_analysis(self):
-        self.get_PE_section()
+        if self.get_PE_section() is None:
+            print("No .data section in this driver.")
+            return {}
         return self.get_function_table()
     
     def get_PE_section(self):     
@@ -26,7 +28,9 @@ class angrPTObject():
         for section in pe.sections:
             if section.Name.decode().strip('\x00') == ".data":
                 data_section = section
-
+        if data_section is None:
+            return None
+        
         self.global_variable_range_start = pe.OPTIONAL_HEADER.ImageBase + data_section.VirtualAddress
         self.global_variable_range_end = self.global_variable_range_start + data_section.SizeOfRawData
         
