@@ -29,7 +29,6 @@
 import os
 import sys
 import json
-import angr
 import pprint
 import logging
 import datetime
@@ -44,8 +43,8 @@ class FullPath(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         setattr(namespace, self.dest, os.path.abspath(os.path.expanduser(values)))
 
-def to_hex_simple(d):        
-    hex_data = {}    
+def to_hex_simple(d):      
+    hex_data = {}   
     for key, value in d.items():
         hex_key = hex(key)
         hex_value = {k: hex(v) for k, v in value.items()}
@@ -79,7 +78,7 @@ def mkdir(dir_path):
 
 def parse_is_file(dirname):
     if not os.path.isfile(dirname):
-        msg = "{0} is not a file".format(dirname)
+        msg = f"{dirname} is not a file"
         raise argparse.ArgumentTypeError(msg)
     else:
         return dirname
@@ -95,7 +94,7 @@ def parseArguments():
                         type=parse_is_file, help='path to the driver')
     parser.add_argument('-log', default='FATAL', choices=('DEBUG', 'INFO', 'WARNING', 'ERROR', 'FATAL'), help='set a logging level')
     parser.add_argument('-skip', default=False, action='store_true', help='skip the functions that do not need to be analyzed')
-    parser.add_argument('-output', metavar='<file>', action=FullPath, help='path to a output file')
+    parser.add_argument('-output', default='result', metavar='<directory>', action=FullPath, help='path to an output directory')
     parser.add_argument('--user-static', default=False, help='ioctl address ex) 0x114bc')
     return parser, parser.parse_args()
 
@@ -103,10 +102,8 @@ if __name__ == '__main__':
     parser, args = parseArguments()
     setupLogging(args)
     
-    mkdir('result')
-
     if len(sys.argv) <= 1:
-        print("usage: %s" % parser.usage)
+        print(f"usage: {parser.usage}")
         sys.exit()
 
     start_time = datetime.datetime.utcnow()
@@ -115,7 +112,7 @@ if __name__ == '__main__':
     if True:
         print("Finding DeviceName...")
         device_name = driver.find_device_name()
-        print("\t> DeviceName : %s\n" % device_name)
+        print(f"\t> DeviceName : {device_name}\n")
         
         print("Finding DispatchDeviceControl...")
         mj_device_control_func = driver.find_dispatcher(args.user_static)
@@ -133,28 +130,31 @@ if __name__ == '__main__':
         print("\t> [angrPT] IOCTL RIP INFO :")
         ioctl_infos_hex = to_rip_hex_simple(ioctl_infos)
         pp.pprint(ioctl_infos_hex)
-
+        xref_spider = None
         try:
             angrPT = mangrpt.angrPTObject(args.driver, mj_device_control_func, ioctl_infos)
-            xref_spider = to_hex_xref(angrPT.go_analysis())
+            if angrPT is not None:
+                xref_spider = to_hex_xref(angrPT.go_analysis())
             print('[angrPT] success')
 
         except Exception as e:
-            print('[angrPT] fail')            
+            print(f'[angrPT] fail: {e}')      
             xref_spider = 'error'
         
         if '/' in args.driver:
             output_name = args.driver.split('/')[-1].split('.')[0]
         else:
             output_name = args.driver.split('.')[0]
-        mkdir(f'result/{output_name}')
         
-        with open(f'result/{output_name}/{output_name}.json', "w") as json_file:
+        mkdir(f'{args.output}/{output_name}')
+        
+        with open(f'{args.output}/{output_name}/{output_name}.json', "w") as json_file:
             json.dump(ioctl_interface, json_file)
-        with open(f'result/{output_name}/{output_name}.rip.json', "w") as json_file:
+        with open(f'{args.output}/{output_name}/{output_name}.rip.json', "w") as json_file:
             json.dump(ioctl_infos_hex, json_file)
-        with open(f'result/{output_name}/{output_name}.xref.json', "w") as json_file:
-            json.dump(xref_spider, json_file)
+        if xref_spider is not None:
+            with open(f'{args.output}/{output_name}/{output_name}.xref.json', "w") as json_file:
+                json.dump(xref_spider, json_file)
         
     else:
         print("[!] '%s' is not a supported driver." % args.driver)
