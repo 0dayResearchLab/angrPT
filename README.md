@@ -22,7 +22,8 @@ framework
 └── angrpt.py                               # Main module
 ```
 
-## Install Dependencies
+## Manual Usage
+- Install Dependencies
 
 ```shell
 pip uninstall virtualenv
@@ -44,7 +45,17 @@ git clone https://github.com/axt/angr-utils
 pip install -e ./angr-utils
 ```
 
-## Starting Analyze 
+- Starting Analyze 
 ```
 python3 angrpt.py -d [Driver Name] --user-static [Address of Device IoControl Handler]
+```
+
+## Docker Usage
+- Docker build
+```
+docker build -t angrpt .
+```
+- Start Analyze
+```
+docker run --rm -v $(pwd):/data angrpt -d [Driver Name] --user-static [Address of Device IoControl Handler] -output /data
 ```
