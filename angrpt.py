@@ -93,7 +93,6 @@ def parseArguments():
     parser.add_argument('-driver', metavar='<file>', required=True, action=FullPath,
                         type=parse_is_file, help='path to the driver')
     parser.add_argument('-log', default='FATAL', choices=('DEBUG', 'INFO', 'WARNING', 'ERROR', 'FATAL'), help='set a logging level')
-    parser.add_argument('-skip', default=False, action='store_true', help='skip the functions that do not need to be analyzed')
     parser.add_argument('-output', default='result', metavar='<directory>', action=FullPath, help='path to an output directory')
     parser.add_argument('--user-static', default=False, help='ioctl address ex) 0x114bc')
     return parser, parser.parse_args()
@@ -107,7 +106,7 @@ if __name__ == '__main__':
         sys.exit()
 
     start_time = datetime.datetime.utcnow()
-    driver = wdm.WDMDriverAnalysis(args.driver, skip_call_mode=args.skip)
+    driver = wdm.WDMDriverAnalysis(args.driver)
     
     if True:
         print("Finding DeviceName...")

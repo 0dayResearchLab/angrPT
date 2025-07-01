@@ -89,7 +89,6 @@ class WDMDriverAnalysis(angr.Project):
     def __init__(self, *args, **kwargs):
         """
         - kwargs
-        :skip_call_mode: Only functions with specific arguments are analyzed.
         """
 
         kwargs['auto_load_libs'] = kwargs.pop('auto_load_libs', False)
@@ -97,7 +96,6 @@ class WDMDriverAnalysis(angr.Project):
         #kwargs['use_sim_procedures'] = kwargs.pop('use_sim_procedures', False)
         
         self.driver_path = args[0]
-        self.skip_call_mode = kwargs.pop('skip_call_mode', False)
 
         super(WDMDriverAnalysis, self).__init__(*args, **kwargs)
         self.factory = WDMDriverFactory(self)
@@ -124,40 +122,6 @@ class WDMDriverAnalysis(angr.Project):
                 state.regs.rax = state.solver.BVS('ret', 64)
 
             state.inspect.b('call', action=force_skip_call)
-
-        elif mode == 'skip_call':
-            def skip_function_by_arguments(state):
-                # Get parameters of the current function.
-                parameters = []
-
-                skip = True
-                for arg_type in parameters:
-                    if '+' not in arg_type:     # register
-                        argument = getattr(state.regs, arg_type)
-                    else:                       # stack value
-                        offset = int(arg_type.split('+')[-1], 16)
-                        argument = state.mem[getattr(state.regs, arg_type.split('+')[0]) + offset].uint64_t.resolved
-                        
-                    if argument.symbolic:
-                        argument = str(argument)
-
-                        for arg in allowed_arguments:
-                            if isinstance(arg, str) and arg in argument:
-                                skip = False
-                    else:
-                        argument = state.solver.eval(argument)
-
-                        if argument in allowed_arguments:
-                            skip = False
-
-                    if skip == False:
-                        break
-
-                if skip:
-                    state.mem[state.regs.rip].uint8_t = 0xc3
-                    state.regs.rax = state.solver.BVS('ret', 64)
-
-            state.inspect.b('call', action=skip_function_by_arguments)
 
         elif mode == 'symbolize_global_variables':
             self.global_variables = []
@@ -214,8 +178,6 @@ class WDMDriverAnalysis(angr.Project):
         """
 
         state = self.project.factory.call_state(self.project.entry, ARG_DRIVEROBJECT, ARG_REGISTRYPATH)
-        if self.skip_call_mode:
-            self.set_mode('skip_call', state, allowed_arguments=[ARG_DRIVEROBJECT])
 
         simgr = self.project.factory.simgr(state)
 
