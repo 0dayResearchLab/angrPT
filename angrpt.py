@@ -95,6 +95,7 @@ def parseArguments():
     parser.add_argument('-log', default='FATAL', choices=('DEBUG', 'INFO', 'WARNING', 'ERROR', 'FATAL'), help='set a logging level')
     parser.add_argument('-output', default='result', metavar='<directory>', action=FullPath, help='path to an output directory')
     parser.add_argument('--user-static', default=False, help='ioctl address ex) 0x114bc')
+    parser.add_argument('--wdf', action='store_true', help='enable WDF mode for IOCTL handler analysis')
     return parser, parser.parse_args()
 
 if __name__ == '__main__':
@@ -106,7 +107,7 @@ if __name__ == '__main__':
         sys.exit()
 
     start_time = datetime.datetime.utcnow()
-    driver = wdm.WDMDriverAnalysis(args.driver)
+    driver = wdm.WDMDriverAnalysis(args.driver, is_wdf=args.wdf)
     
     if True:
         print("Finding DeviceName...")

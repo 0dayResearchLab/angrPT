@@ -18,6 +18,13 @@ ARG_REGISTRYPATH = 0xdead2000
 ARG_IRP = 0xdead3000
 ARG_IOSTACKLOCATION = 0xdead4000
 
+# WDF Arguments
+ARG_QUEUE = 0xdead5000
+ARG_REQUEST = 0xdead6000
+ARG_OUTPUTBUFFERLENGTH = 0xdead7000
+ARG_INPUTBUFFERLENGTH = 0xdead8000
+ARG_IOCONTROLCODE = 0xdead9000
+
 ERR_VALUE = 0x1000000
 
 good_range = 0
@@ -96,6 +103,7 @@ class WDMDriverAnalysis(angr.Project):
         #kwargs['use_sim_procedures'] = kwargs.pop('use_sim_procedures', False)
         
         self.driver_path = args[0]
+        self.is_wdf = kwargs.pop('is_wdf', False)  # WDF mode flag
 
         super(WDMDriverAnalysis, self).__init__(*args, **kwargs)
         self.factory = WDMDriverFactory(self)
@@ -216,20 +224,47 @@ class WDMDriverAnalysis(angr.Project):
         - An IOCTL Interface contains IoControlCode, InputBufferLength and OutputBufferLength.
         """
 
-        state = self.project.factory.call_state(self.major_functions['DispatchDeviceControl'], ARG_DRIVEROBJECT, ARG_IRP)
-        self.set_mode('symbolize_global_variables', state)
-        simgr = self.project.factory.simgr(state)
+        if self.is_wdf:
+            # WDF IOCTL Handler: IoctlHandler(WDFQUEUE Queue, WDFREQUEST Request, size_t OutputBufferLength, size_t InputBufferLength, ULONG IoControlCode)
+            output_buffer_length = claripy.BVS('OutputBufferLength', 64)
+            input_buffer_length = claripy.BVS('InputBufferLength', 64)
+            io_control_code = claripy.BVS('IoControlCode', 32)
+            
+            state = self.project.factory.call_state(
+                self.major_functions['DispatchDeviceControl'], 
+                ARG_QUEUE, 
+                ARG_REQUEST, 
+                output_buffer_length,
+                input_buffer_length,
+                io_control_code
+            )
+            self.set_mode('symbolize_global_variables', state)
+            simgr = self.project.factory.simgr(state)
+            
+            # Find all I/O control codes.
+            state_finder = explore_technique.SwitchStateFinder(io_control_code)
+            simgr.use_technique(state_finder)
+            simgr.run(n=30)
+        else:
+            # WDM IOCTL Handler: Uses IRP structure
+            state = self.project.factory.call_state(self.major_functions['DispatchDeviceControl'], ARG_DRIVEROBJECT, ARG_IRP)
+            self.set_mode('symbolize_global_variables', state)
+            simgr = self.project.factory.simgr(state)
 
-        io_stack_location = structures.IO_STACK_LOCATION(state, ARG_IOSTACKLOCATION)
-        irp = structures.IRP(state, ARG_IRP)
+            io_stack_location = structures.IO_STACK_LOCATION(state, ARG_IOSTACKLOCATION)
+            irp = structures.IRP(state, ARG_IRP)
 
-        state.solver.add(irp.fields['Tail.Overlay.CurrentStackLocation'] == io_stack_location.address)
-        state.solver.add(io_stack_location.fields['MajorFunction'] == 14)
+            state.solver.add(irp.fields['Tail.Overlay.CurrentStackLocation'] == io_stack_location.address)
+            state.solver.add(io_stack_location.fields['MajorFunction'] == 14)
 
-        # Find all I/O control codes.
-        state_finder = explore_technique.SwitchStateFinder(io_stack_location.fields['IoControlCode'])
-        simgr.use_technique(state_finder)
-        simgr.run(n=30)
+            # Find all I/O control codes.
+            state_finder = explore_technique.SwitchStateFinder(io_stack_location.fields['IoControlCode'])
+            simgr.use_technique(state_finder)
+            simgr.run(n=30)
+            
+            # Set buffer length variables for later use
+            input_buffer_length = io_stack_location.fields['InputBufferLength']
+            output_buffer_length = io_stack_location.fields['OutputBufferLength']
 
         ioctl_interface = []
 
@@ -287,9 +322,9 @@ class WDMDriverAnalysis(angr.Project):
                             hihi = True
                             x= {'IoControlCode': hex(ioctl_code), 
                                 'InBufferLength': list(speculate_bvs_range(state, 
-                                                            io_stack_location.fields['InputBufferLength'])),
+                                                            input_buffer_length)),
                                 'OutBufferLength': list(speculate_bvs_range(state,
-                                                            io_stack_location.fields['OutputBufferLength'])
+                                                            output_buffer_length)
                                 )}
                             ioctl_interface.append(x)
 
@@ -314,9 +349,9 @@ class WDMDriverAnalysis(angr.Project):
                                 founded = True
                                 x= {'IoControlCode': hex(ioctl_code), 
                                     'InBufferLength': list(speculate_bvs_range(state, 
-                                                                io_stack_location.fields['InputBufferLength'])),
+                                                                input_buffer_length)),
                                     'OutBufferLength': list(speculate_bvs_range(state,
-                                                                io_stack_location.fields['OutputBufferLength'])
+                                                                output_buffer_length)
                                     )}
                                 ioctl_interface.append(x)
                                 #print("simgr.active",x,"\n")
@@ -334,9 +369,9 @@ class WDMDriverAnalysis(angr.Project):
                                 founded = True
                                 x= {'IoControlCode': hex(ioctl_code), 
                                     'InBufferLength': list(speculate_bvs_range(state, 
-                                                                io_stack_location.fields['InputBufferLength'])),
+                                                                input_buffer_length)),
                                     'OutBufferLength': list(speculate_bvs_range(state,
-                                                                io_stack_location.fields['OutputBufferLength'])
+                                                                output_buffer_length)
                                     )}
                                 ioctl_interface.append(x)
                                 #print("simgr.deadended",x,"\n")
@@ -383,9 +418,9 @@ class WDMDriverAnalysis(angr.Project):
                             sat_state = case_state
                         ioctl_interface.append({'IoControlCode': hex(ioctl_code), 
                                         'InBufferLength': list(speculate_bvs_range(sat_state, 
-                                                                    io_stack_location.fields['InputBufferLength'])),
+                                                                    input_buffer_length)),
                                         'OutBufferLength': list(speculate_bvs_range(sat_state,
-                                                                    io_stack_location.fields['OutputBufferLength'])
+                                                                    output_buffer_length)
                                         )})
 
                 gogogo(case_state)
@@ -396,9 +431,9 @@ class WDMDriverAnalysis(angr.Project):
                 sat_state = case_state
                 x= {'IoControlCode': hex(ioctl_code), 
                                         'InBufferLength': list(speculate_bvs_range(sat_state, 
-                                                                    io_stack_location.fields['InputBufferLength'])),
+                                                                    input_buffer_length)),
                                         'OutBufferLength': list(speculate_bvs_range(sat_state,
-                                                                    io_stack_location.fields['OutputBufferLength'])
+                                                                    output_buffer_length)
                                         )}
                 ioctl_interface.append(x)                
         
